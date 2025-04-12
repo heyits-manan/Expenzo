@@ -1,20 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent, ChangeEvent } from "react";
 import {
-  PieChart,
-  BarChart,
-  LineChart,
+
   ArrowUpRight,
   ArrowDownRight,
-  DollarSign,
-  CreditCard,
+
   LightbulbIcon,
   BarChart3,
   MoreHorizontal,
   Calendar,
   Plus,
-  X,
+
 } from "lucide-react";
 import {
   Card,
@@ -27,7 +24,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +39,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,16 +58,54 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart as ReBarChart,
-  Bar,
-  PieChart as RePieChart,
-  Pie,
-  Cell,
 } from "recharts";
 import { UserButton } from "@clerk/nextjs";
 
+// Type definitions
+interface Transaction {
+  id?: number;
+  amount: string;
+  description: string;
+  type: "income" | "expense";
+  date: string;
+  categoryId?: number;
+}
+
+interface Category {
+  id: number;
+  name: string;
+  type: "income" | "expense";
+  color: string;
+}
+
+interface Budget {
+  id: number;
+  categoryId: number;
+  amount: number;
+}
+
+interface Insight {
+  id: number;
+  content: string;
+  createdAt: string;
+}
+
+interface MonthlyData {
+  name: string;
+  income: number;
+  expenses: number;
+}
+
+interface NewTransaction {
+  amount: string;
+  description: string;
+  category: string;
+  type: "income" | "expense";
+  date: string;
+}
+
 // Database utility functions
-const fetchTransactions = async () => {
+const fetchTransactions = async (): Promise<Transaction[]> => {
   try {
     const response = await fetch("/api/transactions");
     if (!response.ok) throw new Error("Failed to fetch transactions");
@@ -81,7 +116,7 @@ const fetchTransactions = async () => {
   }
 };
 
-const fetchCategories = async () => {
+const fetchCategories = async (): Promise<Category[]> => {
   try {
     const response = await fetch("/api/categories");
     if (!response.ok) throw new Error("Failed to fetch categories");
@@ -92,7 +127,7 @@ const fetchCategories = async () => {
   }
 };
 
-const fetchBudgets = async () => {
+const fetchBudgets = async (): Promise<Budget[]> => {
   try {
     const response = await fetch("/api/budgets");
     if (!response.ok) throw new Error("Failed to fetch budgets");
@@ -103,7 +138,7 @@ const fetchBudgets = async () => {
   }
 };
 
-const fetchAiInsights = async () => {
+const fetchAiInsights = async (): Promise<Insight[]> => {
   try {
     const response = await fetch("/api/ai-insights");
     if (!response.ok) throw new Error("Failed to fetch AI insights");
@@ -114,7 +149,13 @@ const fetchAiInsights = async () => {
   }
 };
 
-const addTransaction = async (transactionData) => {
+const addTransaction = async (transactionData: { 
+  amount: number | string; 
+  description: string; 
+  category: string; 
+  type: string; 
+  date: string; 
+}): Promise<Transaction> => {
     const response = await fetch("/api/transactions", {
       method: "POST",
       headers: {
@@ -122,35 +163,38 @@ const addTransaction = async (transactionData) => {
       },
       body: JSON.stringify(transactionData),
     });
+    if (!response.ok) throw new Error("Failed to add transaction");
     const data = await response.json();
     return data;
   };
 
 export default function ExpenseTrackerDashboard() {
-  const [currentTab, setCurrentTab] = useState("overview");
-  const [isAddingTransaction, setIsAddingTransaction] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [currentTab, setCurrentTab] = useState<string>("overview");
+  const [isAddingTransaction, setIsAddingTransaction] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // State for data from database
-  const [transactions, setTransactions] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [budgets, setBudgets] = useState([]);
-  const [aiInsights, setAiInsights] = useState([]);
-  const [monthlyData, setMonthlyData] = useState([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [aiInsights, setAiInsights] = useState<Insight[]>([]);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
 
-  const [newTransaction, setNewTransaction] = useState({
+  const [newTransaction, setNewTransaction] = useState<NewTransaction>({
     amount: "",
     description: "",
     category: "",
     type: "expense",
     date: new Date().toISOString().split("T")[0],
   });
-  const fallbackCategories = [
+  
+  const fallbackCategories: Category[] = [
     { id: 1, name: "Groceries", type: "expense", color: "#34D399" },
     { id: 2, name: "Rent", type: "expense", color: "#F87171" },
     { id: 3, name: "Salary", type: "income", color: "#60A5FA" },
     { id: 4, name: "Investments", type: "income", color: "#FBBF24" },
   ];
+  
   // Derived data
   const totalIncome = transactions
     .filter((t) => t.type === "income")
@@ -158,7 +202,7 @@ export default function ExpenseTrackerDashboard() {
 
   const totalExpenses = transactions
     .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + parseFloat(Math.abs(t.amount)), 0);
+    .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
 
   const balance = totalIncome - totalExpenses;
 
@@ -195,7 +239,7 @@ export default function ExpenseTrackerDashboard() {
   }, []);
 
   // Helper function to generate monthly data for charts
-  const generateMonthlyData = (transactionsData) => {
+  const generateMonthlyData = (transactionsData: Transaction[]): MonthlyData[] => {
     const months = [
       "Jan",
       "Feb",
@@ -235,7 +279,7 @@ export default function ExpenseTrackerDashboard() {
 
       const monthExpenses = monthTransactions
         .filter((t) => t.type === "expense")
-        .reduce((sum, t) => sum + parseFloat(Math.abs(t.amount)), 0);
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
 
       return {
         name: month,
@@ -246,7 +290,7 @@ export default function ExpenseTrackerDashboard() {
   };
 
   // Handle form input changes
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setNewTransaction((prev) => ({
       ...prev,
@@ -255,7 +299,7 @@ export default function ExpenseTrackerDashboard() {
   };
 
   // Handle category selection
-  const handleCategoryChange = (value) => {
+  const handleCategoryChange = (value: string) => {
     setNewTransaction((prev) => ({
       ...prev,
       category: value,
@@ -263,7 +307,7 @@ export default function ExpenseTrackerDashboard() {
   };
 
   // Handle transaction type selection
-  const handleTypeChange = (value) => {
+  const handleTypeChange = (value: "income" | "expense") => {
     setNewTransaction((prev) => ({
       ...prev,
       type: value,
@@ -271,7 +315,7 @@ export default function ExpenseTrackerDashboard() {
   };
 
   // Handle form submission
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     // Validate form data
@@ -298,21 +342,15 @@ export default function ExpenseTrackerDashboard() {
       const transactionData = {
         ...newTransaction,
         amount: formattedAmount,
-        // Parse categoryId as integer since it's an integer in your schema
-
       };
 
-      console.log(transactionData)
+      console.log(transactionData);
       // Send data to API
-      const result = await addTransaction(transactionData);
+      await addTransaction(transactionData);
 
       // Refresh transactions data
       const updatedTransactions = await fetchTransactions();
       setTransactions(updatedTransactions);
-
-      // Update monthly data
-    //   const updatedMonthlyData = generateMonthlyData(updatedTransactions);
-    //   setMonthlyData(updatedMonthlyData);
 
       // Reset form and close dialog
       setNewTransaction({
@@ -325,7 +363,6 @@ export default function ExpenseTrackerDashboard() {
       setIsAddingTransaction(false);
 
       // Show success notification
-      // With a toast component: toast({ title: "Transaction added successfully" });
       alert("Transaction added successfully");
     } catch (error) {
       console.error("Error adding transaction:", error);
@@ -337,7 +374,7 @@ export default function ExpenseTrackerDashboard() {
   };
 
   // Format date for display
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     const today = new Date();
     const yesterday = new Date(today);
@@ -365,10 +402,12 @@ export default function ExpenseTrackerDashboard() {
   };
 
   // Get category details by ID
-  const getCategoryById = (categoryId) => {
+  const getCategoryById = (categoryId: number | undefined): Category => {
     return (
       categories.find((cat) => cat.id === categoryId) || {
+        id: 0,
         name: "Uncategorized",
+        type: "expense" as const,
         color: "#888888",
       }
     );
@@ -512,7 +551,7 @@ export default function ExpenseTrackerDashboard() {
                           <YAxis stroke="#888888" tick={{ fontSize: 12 }} />
                           <Tooltip
                             formatter={(value) => [
-                              `$${value.toFixed(2)}`,
+                              `$${typeof value === "number" ? value.toFixed(2) : value}`,
                               undefined,
                             ]}
                           />
@@ -549,7 +588,7 @@ export default function ExpenseTrackerDashboard() {
                     {budgets.length > 0 ? (
                       <div className="space-y-4">
                         {budgets.map((budget) => {
-                          const category = getCategoryById(budget.categoryId);
+                          const category = getCategoryById(budget?.categoryId);
                           const spent = transactions
                             .filter(
                               (t) =>
@@ -620,13 +659,13 @@ export default function ExpenseTrackerDashboard() {
                   <CardContent>
                     {transactions.length > 0 ? (
                       <div className="space-y-4">
-                        {transactions.slice(0, 5).map((transaction) => {
+                        {transactions.slice(0, 5).map((transaction, idx) => {
                           const category = getCategoryById(
                             transaction.categoryId
                           );
                           return (
                             <div
-                              key={transaction.id}
+                              key={transaction.id || idx}
                               className="flex items-center justify-between py-2"
                             >
                               <div className="flex items-center gap-4">
@@ -790,7 +829,7 @@ export default function ExpenseTrackerDashboard() {
                 <Label htmlFor="type">Transaction Type</Label>
                 <Select
                   value={newTransaction.type}
-                  onValueChange={handleTypeChange}
+                  onValueChange={(value: string) => handleTypeChange(value as "income" | "expense")}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
@@ -838,23 +877,21 @@ export default function ExpenseTrackerDashboard() {
               <div className="grid gap-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
-                  value={newTransaction.categoryId}
+                  value={newTransaction.category}
                   onValueChange={handleCategoryChange}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {fallbackCategories
-
-                      .map((category) => (
-                        <SelectItem
-                          key={category.id}
-                          value={category.name}
-                        >
-                          {category.name}
-                        </SelectItem>
-                      ))}
+                    {fallbackCategories.map((category) => (
+                      <SelectItem
+                        key={category.id}
+                        value={category.name}
+                      >
+                        {category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

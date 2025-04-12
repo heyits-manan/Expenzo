@@ -5,7 +5,7 @@ import { transactions } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 
 // Fetch all transactions
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const user = await currentUser(); // Get the authenticated user's ID
     if (!user?.id) {
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   try {
     const  user  = await currentUser(); // Get the authenticated user's ID
 
-    if (!user.id) {
+    if (!user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
