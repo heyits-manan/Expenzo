@@ -1,17 +1,15 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useState, useEffect, FormEvent, ChangeEvent } from "react";
 import {
-
   ArrowUpRight,
   ArrowDownRight,
-
   LightbulbIcon,
   BarChart3,
   MoreHorizontal,
   Calendar,
   Plus,
-
 } from "lucide-react";
 import {
   Card,
@@ -39,7 +37,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,23 +57,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { UserButton } from "@clerk/nextjs";
+import TransactionTab from "@/components/dashboard/transactionTab/TransactionTab";
 
 // Type definitions
-interface Transaction {
-  id?: number;
-  amount: string;
-  description: string;
-  type: "income" | "expense";
-  date: string;
-  categoryId?: number;
-}
-
-interface Category {
-  id: number;
-  name: string;
-  type: "income" | "expense";
-  color: string;
-}
+import { Transaction } from "@/types/transaction";
+import { Category } from "@/types/categories";
 
 interface Budget {
   id: number;
@@ -94,14 +79,6 @@ interface MonthlyData {
   name: string;
   income: number;
   expenses: number;
-}
-
-interface NewTransaction {
-  amount: string;
-  description: string;
-  category: string;
-  type: "income" | "expense";
-  date: string;
 }
 
 // Database utility functions
@@ -149,28 +126,30 @@ const fetchAiInsights = async (): Promise<Insight[]> => {
   }
 };
 
-const addTransaction = async (transactionData: { 
-  amount: number | string; 
-  description: string; 
-  category: string; 
-  type: string; 
-  date: string; 
+const addTransaction = async (transactionData: {
+  amount: number | string;
+  description: string;
+  category: string;
+
+  type: string;
+  date: string;
 }): Promise<Transaction> => {
-    const response = await fetch("/api/transactions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(transactionData),
-    });
-    if (!response.ok) throw new Error("Failed to add transaction");
-    const data = await response.json();
-    return data;
-  };
+  const response = await fetch("/api/transactions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(transactionData),
+  });
+  if (!response.ok) throw new Error("Failed to add transaction");
+  const data = await response.json();
+  return data;
+};
 
 export default function ExpenseTrackerDashboard() {
   const [currentTab, setCurrentTab] = useState<string>("overview");
-  const [isAddingTransaction, setIsAddingTransaction] = useState<boolean>(false);
+  const [isAddingTransaction, setIsAddingTransaction] =
+    useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // State for data from database
@@ -179,32 +158,69 @@ export default function ExpenseTrackerDashboard() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [aiInsights, setAiInsights] = useState<Insight[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [balanceCount, setBalanceCount] = useState<number>(0);
+  const [monthlyIncomeCount, setMonthlyIncomeCount] = useState<number>(0);
+  const [monthlyExpenseCount, setMonthlyExpenseCount] = useState<number>(0);
 
-  const [newTransaction, setNewTransaction] = useState<NewTransaction>({
+  const [newTransaction, setNewTransaction] = useState<Transaction>({
+    id: 0,
     amount: "",
     description: "",
     category: "",
     type: "expense",
     date: new Date().toISOString().split("T")[0],
   });
-  
-  const fallbackCategories: Category[] = [
-    { id: 1, name: "Groceries", type: "expense", color: "#34D399" },
-    { id: 2, name: "Rent", type: "expense", color: "#F87171" },
-    { id: 3, name: "Salary", type: "income", color: "#60A5FA" },
-    { id: 4, name: "Investments", type: "income", color: "#FBBF24" },
+
+  const category: Category[] = [
+    { id: 1, name: "Groceries", type: "expense" },
+    { id: 2, name: "Rent", type: "expense" },
+    { id: 3, name: "Salary", type: "income" },
+    { id: 4, name: "Investments", type: "income" },
+    { id: 5, name: "Entertainment", type: "expense" },
   ];
-  
+
   // Derived data
   const totalIncome = transactions
     .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    .reduce((sum, t) => sum + parseFloat(t.amount.toString()), 0);
 
   const totalExpenses = transactions
     .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+    .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount.toString())), 0);
 
   const balance = totalIncome - totalExpenses;
+
+  useEffect(() => {
+    const duration = 2000; // Animation duration in ms
+    const frameDuration = 1000 / 60; // 60fps
+    const totalFrames = Math.round(duration / frameDuration);
+    let frame = 0;
+
+    // Reset to 0 when balance changes
+    setBalanceCount(0);
+    setMonthlyIncomeCount(0);
+    setMonthlyExpenseCount(0);
+
+    const counter = setInterval(() => {
+      frame++;
+      const progress = frame / totalFrames;
+      // Use easeOutExpo for a more natural counting effect
+      const easeOutProgress = 1 - Math.pow(1 - progress, 3);
+
+      setBalanceCount(balance * easeOutProgress);
+      setMonthlyIncomeCount(totalIncome * easeOutProgress);
+      setMonthlyExpenseCount(totalExpenses * easeOutProgress);
+
+      if (frame === totalFrames) {
+        clearInterval(counter);
+        setBalanceCount(balance); // Ensure we end at the exact balance
+        setMonthlyIncomeCount(totalIncome);
+        setMonthlyExpenseCount(totalExpenses);
+      }
+    }, frameDuration);
+
+    return () => clearInterval(counter);
+  }, [balance, totalIncome, totalExpenses]);
 
   // Load data on component mount
   useEffect(() => {
@@ -239,7 +255,9 @@ export default function ExpenseTrackerDashboard() {
   }, []);
 
   // Helper function to generate monthly data for charts
-  const generateMonthlyData = (transactionsData: Transaction[]): MonthlyData[] => {
+  const generateMonthlyData = (
+    transactionsData: Transaction[]
+  ): MonthlyData[] => {
     const months = [
       "Jan",
       "Feb",
@@ -275,11 +293,11 @@ export default function ExpenseTrackerDashboard() {
 
       const monthIncome = monthTransactions
         .filter((t) => t.type === "income")
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+        .reduce((sum, t) => sum + parseFloat(t.amount.toString()), 0);
 
       const monthExpenses = monthTransactions
         .filter((t) => t.type === "expense")
-        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount.toString())), 0);
 
       return {
         name: month,
@@ -294,7 +312,7 @@ export default function ExpenseTrackerDashboard() {
     const { name, value } = e.target;
     setNewTransaction((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: name === "amount" ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -335,8 +353,8 @@ export default function ExpenseTrackerDashboard() {
       // Format amount - for expenses, store as negative value
       const formattedAmount =
         newTransaction.type === "expense"
-          ? -Math.abs(parseFloat(newTransaction.amount))
-          : Math.abs(parseFloat(newTransaction.amount));
+          ? -Math.abs(parseFloat(newTransaction.amount.toString()))
+          : Math.abs(parseFloat(newTransaction.amount.toString()));
 
       // Prepare transaction data
       const transactionData = {
@@ -354,6 +372,7 @@ export default function ExpenseTrackerDashboard() {
 
       // Reset form and close dialog
       setNewTransaction({
+        id: 0,
         amount: "",
         description: "",
         category: "",
@@ -374,11 +393,12 @@ export default function ExpenseTrackerDashboard() {
   };
 
   // Format date for display
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
+  const formatDate = (input: string | Date): string => {
+    const date = typeof input === "string" ? new Date(input) : input;
+
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
 
     if (date.toDateString() === today.toDateString()) {
       return `Today, ${date.toLocaleTimeString([], {
@@ -399,18 +419,6 @@ export default function ExpenseTrackerDashboard() {
         minute: "2-digit",
       })}`;
     }
-  };
-
-  // Get category details by ID
-  const getCategoryById = (categoryId: number | undefined): Category => {
-    return (
-      categories.find((cat) => cat.id === categoryId) || {
-        id: 0,
-        name: "Uncategorized",
-        type: "expense" as const,
-        color: "#888888",
-      }
-    );
   };
 
   return (
@@ -468,7 +476,20 @@ export default function ExpenseTrackerDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      ${balance.toFixed(2)}
+                      <motion.div
+                        className="text-4xl font-bold text-green-600"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        ${balanceCount.toFixed(2)}
+                      </motion.div>
+                      <motion.div
+                        className="h-1 bg-green-500 rounded-full mt-2"
+                        initial={{ width: 0 }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 2, ease: "easeOut" }}
+                      />
                     </div>
                     <div className="flex items-center text-sm text-green-600 mt-1">
                       <ArrowUpRight className="h-4 w-4 mr-1" />
@@ -483,8 +504,15 @@ export default function ExpenseTrackerDashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">
-                      ${totalIncome.toFixed(2)}
+                    <div className=" font-bold">
+                      <motion.div
+                        className="text-3xl font-bold text-green-600"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        ${monthlyIncomeCount.toFixed(2)}
+                      </motion.div>
                     </div>
                     <div className="flex items-center text-sm text-green-600 mt-1">
                       <ArrowUpRight className="h-4 w-4 mr-1" />
@@ -499,8 +527,15 @@ export default function ExpenseTrackerDashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">
-                      ${totalExpenses.toFixed(2)}
+                    <div className=" font-bold">
+                      <motion.div
+                        className="text-3xl font-bold text-red-600"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                      >
+                        ${monthlyExpenseCount.toFixed(2)}
+                      </motion.div>
                     </div>
                     <div className="flex items-center text-sm text-red-600 mt-1">
                       <ArrowDownRight className="h-4 w-4 mr-1" />
@@ -551,7 +586,11 @@ export default function ExpenseTrackerDashboard() {
                           <YAxis stroke="#888888" tick={{ fontSize: 12 }} />
                           <Tooltip
                             formatter={(value) => [
-                              `$${typeof value === "number" ? value.toFixed(2) : value}`,
+                              `$${
+                                typeof value === "number"
+                                  ? value.toFixed(2)
+                                  : value
+                              }`,
                               undefined,
                             ]}
                           />
@@ -588,17 +627,11 @@ export default function ExpenseTrackerDashboard() {
                     {budgets.length > 0 ? (
                       <div className="space-y-4">
                         {budgets.map((budget) => {
-                          const category = getCategoryById(budget?.categoryId);
-                          const spent = transactions
-                            .filter(
-                              (t) =>
-                                t.categoryId === budget.categoryId &&
-                                t.type === "expense"
-                            )
-                            .reduce(
-                              (sum, t) => sum + Math.abs(parseFloat(t.amount)),
-                              0
-                            );
+                          const spent = transactions.reduce(
+                            (sum, t) =>
+                              sum + Math.abs(parseFloat(t.amount.toString())),
+                            0
+                          );
 
                           const percentSpent = (spent / budget.amount) * 100;
 
@@ -606,21 +639,16 @@ export default function ExpenseTrackerDashboard() {
                             <div key={budget.id} className="space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-sm">
-                                  {category.name}
+                                  {category.find(
+                                    (cat) => cat.id === budget.categoryId
+                                  )?.name || "Unknown"}
                                 </span>
                                 <span className="text-sm text-gray-500">
                                   ${spent.toFixed(2)} / $
                                   {budget.amount.toFixed(2)}
                                 </span>
                               </div>
-                              <Progress
-                                value={percentSpent}
-                                className="h-2"
-                                style={{
-                                  backgroundColor: `${category.color}20`,
-                                  color: category.color,
-                                }}
-                              />
+                              <Progress value={percentSpent} className="h-2" />
                             </div>
                           );
                         })}
@@ -660,26 +688,20 @@ export default function ExpenseTrackerDashboard() {
                     {transactions.length > 0 ? (
                       <div className="space-y-4">
                         {transactions.slice(0, 5).map((transaction, idx) => {
-                          const category = getCategoryById(
-                            transaction.categoryId
-                          );
                           return (
                             <div
                               key={transaction.id || idx}
                               className="flex items-center justify-between py-2"
                             >
                               <div className="flex items-center gap-4">
-                                <Avatar
-                                  className="h-9 w-9"
-                                  style={{
-                                    backgroundColor: `${category.color}20`,
-                                  }}
-                                >
-                                  <AvatarFallback
-                                    style={{ color: category.color }}
-                                  >
-                                    {category.name.charAt(0) +
-                                      category.name.charAt(1)}
+                                <Avatar className="h-9 w-9">
+                                  <AvatarFallback>
+                                    {categories
+                                      .find(
+                                        (cat) =>
+                                          cat.name === transaction.category
+                                      )
+                                      ?.name.slice(0, 2) || "NA"}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
@@ -701,11 +723,13 @@ export default function ExpenseTrackerDashboard() {
                                 >
                                   {transaction.type === "income" ? "+" : "-"}$
                                   {Math.abs(
-                                    parseFloat(transaction.amount)
+                                    parseFloat(transaction.amount.toString())
                                   ).toFixed(2)}
                                 </span>
                                 <Badge variant="outline" className="text-xs">
-                                  {category.name}
+                                  {categories.find(
+                                    (cat) => cat.name === transaction.category
+                                  )?.name || "Unknown"}
                                 </Badge>
                               </div>
                             </div>
@@ -788,11 +812,10 @@ export default function ExpenseTrackerDashboard() {
             </TabsContent>
 
             <TabsContent value="transactions">
-              <div className="flex justify-center items-center h-96">
-                <p className="text-gray-500">
-                  Transactions tab content would go here
-                </p>
-              </div>
+              <TransactionTab
+                transactions={transactions}
+                formatDate={formatDate}
+              />
             </TabsContent>
 
             <TabsContent value="budgets">
@@ -829,7 +852,9 @@ export default function ExpenseTrackerDashboard() {
                 <Label htmlFor="type">Transaction Type</Label>
                 <Select
                   value={newTransaction.type}
-                  onValueChange={(value: string) => handleTypeChange(value as "income" | "expense")}
+                  onValueChange={(value: string) =>
+                    handleTypeChange(value as "income" | "expense")
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
@@ -884,11 +909,8 @@ export default function ExpenseTrackerDashboard() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {fallbackCategories.map((category) => (
-                      <SelectItem
-                        key={category.id}
-                        value={category.name}
-                      >
+                    {category.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
                         {category.name}
                       </SelectItem>
                     ))}

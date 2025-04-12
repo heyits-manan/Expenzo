@@ -29,6 +29,20 @@
       "when": 1744439494184,
       "tag": "0003_tired_silvermane",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1744472607296,
+      "tag": "0004_grey_juggernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1744475770543,
+      "tag": "0005_sloppy_baron_strucker",
+      "breakpoints": true
     }
   ]
 }

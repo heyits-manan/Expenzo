@@ -1,0 +1,1 @@
+ALTER TABLE "transactions" ADD COLUMN "category_id" integer;
